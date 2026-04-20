@@ -14,6 +14,14 @@ const (
 	Transient
 )
 
+type Acktype int
+
+const (
+	Ack Acktype = iota
+	NackDiscard
+	NackRequeue
+)
+
 func DeclareAndBind(
 	conn *amqp.Connection,
 	exchange,
@@ -44,7 +52,7 @@ func SubscribeJSON[T any](
 	queueName,
 	key string,
 	queueType SimpleQueueType,
-	handler func(T),
+	handler func(T) Acktype,
 ) error {
 	ch, _, err := DeclareAndBind(conn, exchange, queueName, key, queueType)
 	if err != nil {
@@ -63,9 +71,17 @@ func SubscribeJSON[T any](
 				fmt.Printf("couln't get the data: %v", err)
 				continue
 			}
-			handler(data)
-			if err := delivery.Ack(false); err != nil {
-				fmt.Printf("couldn't remove message: %v", err)
+			ackType := handler(data)
+			switch ackType {
+			case Ack:
+				delivery.Ack(false)
+				fmt.Println("Ack")
+			case NackDiscard:
+				delivery.Nack(false, false)
+				fmt.Println("Nack and discard")
+			case NackRequeue:
+				delivery.Nack(false, true)
+				fmt.Println("Nack and requeue")
 			}
 		}
 	}()
