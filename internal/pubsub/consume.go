@@ -34,7 +34,9 @@ func DeclareAndBind(
 		return nil, amqp.Queue{}, err
 	}
 
-	q, err := ch.QueueDeclare(queueName, queueType == Durable, queueType == Transient, queueType == Transient, false, nil)
+	q, err := ch.QueueDeclare(queueName, queueType == Durable, queueType == Transient, queueType == Transient, false, amqp.Table{
+		"x-dead-letter-exchange": "peril_dlx",
+	})
 	if err != nil {
 		return nil, amqp.Queue{}, err
 	}
