@@ -1,6 +1,8 @@
 package pubsub
 
 import (
+	"bytes"
+	"encoding/gob"
 	"encoding/json"
 	"fmt"
 
@@ -69,6 +71,51 @@ func SubscribeJSON[T any](
 		for delivery := range deliveries {
 			var data T
 			err := json.Unmarshal(delivery.Body, &data)
+			if err != nil {
+				fmt.Printf("couln't get the data: %v", err)
+				continue
+			}
+			ackType := handler(data)
+			switch ackType {
+			case Ack:
+				delivery.Ack(false)
+				fmt.Println("Ack")
+			case NackDiscard:
+				delivery.Nack(false, false)
+				fmt.Println("Nack and discard")
+			case NackRequeue:
+				delivery.Nack(false, true)
+				fmt.Println("Nack and requeue")
+			}
+		}
+	}()
+
+	return nil
+}
+
+func SubscribeGob[T any](
+	conn *amqp.Connection,
+	exchange,
+	queueName,
+	key string,
+	queueType SimpleQueueType,
+	handler func(T) Acktype,
+) error {
+	ch, _, err := DeclareAndBind(conn, exchange, queueName, key, queueType)
+	if err != nil {
+		return fmt.Errorf("could not declare and bind queue: %w", err)
+	}
+
+	deliveries, err := ch.Consume(queueName, "", false, false, false, false, nil)
+	if err != nil {
+		return fmt.Errorf("couldn't deliver message: %w", err)
+	}
+	go func() {
+		for delivery := range deliveries {
+			var data T
+			buffer := bytes.NewBuffer(delivery.Body)
+			decoder := gob.NewDecoder(buffer)
+			err := decoder.Decode(&data)
 			if err != nil {
 				fmt.Printf("couln't get the data: %v", err)
 				continue
