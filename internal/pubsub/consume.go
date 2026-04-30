@@ -63,6 +63,11 @@ func SubscribeJSON[T any](
 		return fmt.Errorf("could not declare and bind queue: %w", err)
 	}
 
+	err = ch.Qos(10, 0, false)
+	if err != nil {
+		return fmt.Errorf("could not set limit: %v", err)
+	}
+
 	deliveries, err := ch.Consume(queueName, "", false, false, false, false, nil)
 	if err != nil {
 		return fmt.Errorf("couldn't deliver message: %w", err)
@@ -73,6 +78,7 @@ func SubscribeJSON[T any](
 			err := json.Unmarshal(delivery.Body, &data)
 			if err != nil {
 				fmt.Printf("couln't get the data: %v", err)
+				delivery.Nack(false, false)
 				continue
 			}
 			ackType := handler(data)
@@ -106,6 +112,11 @@ func SubscribeGob[T any](
 		return fmt.Errorf("could not declare and bind queue: %w", err)
 	}
 
+	err = ch.Qos(10, 0, false)
+	if err != nil {
+		return fmt.Errorf("could not set limit: %v", err)
+	}
+
 	deliveries, err := ch.Consume(queueName, "", false, false, false, false, nil)
 	if err != nil {
 		return fmt.Errorf("couldn't deliver message: %w", err)
@@ -118,6 +129,7 @@ func SubscribeGob[T any](
 			err := decoder.Decode(&data)
 			if err != nil {
 				fmt.Printf("couln't get the data: %v", err)
+				delivery.Nack(false, false)
 				continue
 			}
 			ackType := handler(data)
